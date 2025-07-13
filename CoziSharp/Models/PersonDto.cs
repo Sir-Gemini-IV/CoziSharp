@@ -1,7 +1,4 @@
-﻿// PersonDto.cs
-// Represents a person (family member) from the Cozi account.
-
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace CoziSharp.Models
 {
@@ -10,6 +7,9 @@ namespace CoziSharp.Models
     /// </summary>
     public sealed class PersonDto
     {
+        [JsonPropertyName("accountPersonId")]
+        public string AccountPersonId { get; set; } = string.Empty;
+
         [JsonPropertyName("personId")]
         public string PersonId { get; set; } = string.Empty;
 

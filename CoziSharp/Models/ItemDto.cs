@@ -1,10 +1,4 @@
-﻿// ItemDto.cs
-// DTO for a single list item returned by Cozi's private API.
-// Mirrors the JSON shape used by py‑cozi.  Fields beyond the core three
-// are optional and may not appear in every payload, so they are marked nullable.
-
-using System;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace CoziSharp.Models
