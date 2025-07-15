@@ -1,4 +1,9 @@
-﻿using System;
+﻿// Helpers/CalendarHelpers.cs
+// Extend flattening helpers so consumers can enrich either a single CalendarEntry
+// or a list of CalendarEntry objects with attendee information.
+// Existing Month → IEnumerable<CalendarEntryWithAttendees> helper retained.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -9,9 +14,9 @@ namespace CoziSharp.Helpers
 {
     public static class CalendarHelpers
     {
-        /// <summary>
-        /// Flatten Cozi’s days/items dictionaries into a simple sequence of CalendarEntry.
-        /// </summary>
+        /*------------------------------------------------------------
+         * Basic flatten: MonthDto → IEnumerable<CalendarEntry>
+         *-----------------------------------------------------------*/
         public static IEnumerable<CalendarEntry> Flatten(CalendarMonthDto month)
         {
             foreach (var (dateStr, refs) in month.Days)
@@ -26,48 +31,73 @@ namespace CoziSharp.Helpers
             }
         }
 
-        public static async Task<IEnumerable<CalendarEntryWithAttendees>> FlattenWithAttendeesAsync(this CalendarMonthDto month, CoziClient client, CancellationToken ct = default)
+        /*------------------------------------------------------------
+         * Enrich MONTH with attendees (unchanged signature)
+         *-----------------------------------------------------------*/
+        public static async Task<IEnumerable<CalendarEntryWithAttendees>> FlattenWithAttendeesAsync(
+            this CalendarMonthDto month,
+            CoziClient client,
+            CancellationToken ct = default)
         {
-            var entries = new List<CalendarEntryWithAttendees>();
-
-            // Fetch all people once
             var allPeople = await client.GetPeopleAsync(ct).ConfigureAwait(false);
+            var tasks = new List<Task<CalendarEntryWithAttendees>>();
 
-            foreach (var (dateStr, refs) in month.Days)
-            {
-                if (!DateTime.TryParse(dateStr, out var date)) continue;
+            foreach (var entry in Flatten(month))
+                tasks.Add(entry.WithAttendeesAsync(client, allPeople, ct));
 
-                foreach (var r in refs)
-                {
-                    if (month.Items.TryGetValue(r.Id, out var item))
-                    {
-                        // Use your helper to get attendees from either AttendeeSet or Extra
-                        var attendees = item.GetAttendeesFromExtra(allPeople);
-
-                        entries.Add(new CalendarEntryWithAttendees(date, item, attendees));
-                    }
-                }
-            }
-
-            return entries;
+            return await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
-        public static async Task<CalendarItemDto?> TryGetCalendarItemAsync(
-        this CoziClient client, string itemId, CancellationToken ct = default)
+        /*------------------------------------------------------------
+         * NEW: Single CalendarEntry → CalendarEntryWithAttendees
+         *-----------------------------------------------------------*/
+        public static async Task<CalendarEntryWithAttendees> WithAttendeesAsync(
+            this CalendarEntry entry,
+            CoziClient client,
+            IReadOnlyList<PersonDto>? cachedPeople = null,
+            CancellationToken ct = default)
         {
-            try
-            {
-                return await client.GetCalendarItemAsync(itemId, ct).ConfigureAwait(false);
-            }
-            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                // Cozi returned 404 – item has no detail record
-                return null;
-            }
+            cachedPeople ??= await client.GetPeopleAsync(ct).ConfigureAwait(false);
+
+            // attendee resolution via helper (AttendeeHelpers extension)
+            var attendees = entry.Item.GetAttendeesFromExtra(cachedPeople);
+            return new CalendarEntryWithAttendees(entry.Date, entry.Item, attendees);
+        }
+
+        /*------------------------------------------------------------
+         * NEW: IEnumerable<CalendarEntry> → IEnumerable<CalendarEntryWithAttendees>
+         *-----------------------------------------------------------*/
+        public static async Task<IEnumerable<CalendarEntryWithAttendees>> WithAttendeesAsync(
+            this IEnumerable<CalendarEntry> entries,
+            CoziClient client,
+            CancellationToken ct = default)
+        {
+            if (entries is null) throw new ArgumentNullException(nameof(entries));
+            var list = entries.ToList();
+            var allPeople = await client.GetPeopleAsync(ct).ConfigureAwait(false);
+
+            var tasks = list.Select(e => e.WithAttendeesAsync(client, allPeople, ct));
+            return await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+
+        /*------------------------------------------------------------
+         * Debug helper
+         *-----------------------------------------------------------*/
+        public static void PrintFull(CalendarEntry entry)
+        {
+            var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+            string json = System.Text.Json.JsonSerializer.Serialize(entry.Item, opts);
+
+            Console.WriteLine($"Date: {entry.Date:yyyy-MM-dd}");
+            Console.WriteLine(json);
+            Console.WriteLine();
         }
     }
 
     public sealed record CalendarEntry(DateTime Date, CalendarItemDto Item);
 
-    public sealed record CalendarEntryWithAttendees(DateTime Date, CalendarItemDto Item, List<PersonDto> Attendees);
+    public sealed record CalendarEntryWithAttendees(
+        DateTime Date,
+        CalendarItemDto Item,
+        IReadOnlyList<PersonDto> Attendees);
 }
