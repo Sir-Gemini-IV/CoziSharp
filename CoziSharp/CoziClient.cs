@@ -1,7 +1,4 @@
-﻿// CoziClient.cs – v0.6 (read-only)
-// Adds Year / Week / Day convenience methods and tries 2004 then 2207 API versions for calendar items.
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -12,7 +9,7 @@ using System.Threading.Tasks;
 using Polly;
 using Polly.Retry;
 using CoziSharp.Models;
-using CoziSharp.Helpers; // for CalendarHelpers.Flatten
+using CoziSharp.Helpers;
 
 namespace CoziSharp
 {

@@ -1,14 +1,4 @@
-﻿// Helpers/CalendarHelpers.cs
-// Extend flattening helpers so consumers can enrich either a single CalendarEntry
-// or a list of CalendarEntry objects with attendee information.
-// Existing Month → IEnumerable<CalendarEntryWithAttendees> helper retained.
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using CoziSharp.Models;
+﻿using CoziSharp.Models;
 
 namespace CoziSharp.Helpers
 {
